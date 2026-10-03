@@ -60,13 +60,16 @@ Poi apri <http://localhost:8000>. Il server è raggiungibile anche dagli altri
 dispositivi della stessa rete (telefono, tablet, altri PC): all'avvio lo script
 stampa l'indirizzo da usare, ad esempio `http://192.168.1.20:8000`. Se macOS
 chiede di consentire le connessioni in entrata a Python, rispondi *Consenti*. La pagina mostra il valore BPM, la qualità
-della stima, il grafico del suono del respiro (i punti rossi sono i respiri
+della stima, l'indicatore del **rumore di fondo** (livello del fondo, livello
+dei respiri e margine tra i due, con un giudizio basso/medio/alto), il grafico
+del suono del respiro (i punti rossi sono i respiri
 riconosciuti) e l'andamento nel tempo. Si aggiorna ogni secondo.
 
 Prova senza microfono, con respiri sintetici:
 
 ```bash
 python3 breathe.py --simulate 18
+python3 breathe.py --simulate 18 --sim-noise 0.1   # con rumore di fondo medio
 ```
 
 ### Opzioni utili
@@ -83,7 +86,7 @@ python3 breathe.py --simulate 18
 | `--min-db` | `3` | ampiezza minima di un respiro sopra il fondo |
 | `--low` / `--high` | `150` / `2500` Hz | banda del filtro: restringila se c'è rumore (es. ventole) |
 | `--window` | `45` s | finestra su cui si calcola la media: più lunga = più stabile, più lenta |
-| `--log file.csv` | – | salva ogni secondo timestamp, BPM, qualità e stato |
+| `--log file.csv` | – | salva ogni secondo timestamp, BPM, qualità, rumore di fondo, margine e stato |
 
 Il valore corrente è disponibile anche come JSON su `/api/latest` e come
 stream Server-Sent Events su `/events`, utile per integrarlo altrove.
@@ -99,6 +102,19 @@ stream Server-Sent Events su `/events`, utile per integrarlo altrove.
    segnale, con un minimo in dB) e distanza minima legata a `--max-bpm`.
 5. **BPM** = 60 / mediana degli intervalli tra respiri nella finestra; la
    **qualità** misura la regolarità degli intervalli.
+
+### Rumore di fondo
+
+Il rumore di fondo è il livello dei momenti più silenziosi della finestra
+(10° percentile), cioè le pause tra un respiro e l'altro. Il **margine** è la
+differenza tra il livello tipico dei respiri e il fondo:
+
+- ≥ 12 dB → rumore **basso**, rilevazione affidabile
+- 6–12 dB → rumore **medio**, rilevazione possibile ma meno affidabile
+- < 6 dB → rumore **alto**, il respiro si confonde con il fondo
+
+I valori in dB sono relativi al massimo del microfono (0 dB), quindi dipendono
+dal guadagno impostato in *Preferenze di Sistema → Suono → Ingresso*.
 
 ## Consigli pratici
 

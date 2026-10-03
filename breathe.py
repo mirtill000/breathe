@@ -76,7 +76,9 @@ class BreathDetector:
             n_env = self.n_env
         now = n_env / ENV_RATE  # secondi di audio elaborati
         result = {"t": now, "bpm": None, "quality": 0.0, "level": 0.0,
-                  "envelope": [], "peaks": [], "status": "in ascolto"}
+                  "noise_floor": None, "breath_level": None, "snr": None,
+                  "noise_status": None, "envelope": [], "peaks": [],
+                  "status": "in ascolto"}
         if len(env) < 2 * ENV_RATE:
             result["status"] = "raccolta dati..."
             return result
@@ -99,7 +101,18 @@ class BreathDetector:
             x, prominence=prominence, distance=max(1, int(min_dist * ENV_RATE)))
 
         start_t = now - len(env) / ENV_RATE
-        result["level"] = float(db[-ENV_RATE:].mean())
+        result["level"] = round(float(db[-ENV_RATE:].mean()), 1)
+        # Rumore di fondo: livello dei momenti più silenziosi della finestra
+        # (10° percentile), cioè le pause tra un respiro e l'altro.
+        noise_floor = float(np.percentile(smooth, 10))
+        result["noise_floor"] = round(noise_floor, 1)
+        if len(peaks):
+            breath_level = float(np.median(smooth[peaks]))
+            snr = breath_level - noise_floor
+            result["breath_level"] = round(breath_level, 1)
+            result["snr"] = round(snr, 1)
+            result["noise_status"] = ("basso" if snr >= 12 else
+                                      "medio" if snr >= 6 else "alto")
         # Inviluppo sottocampionato (5 Hz) per il grafico della pagina web.
         step = ENV_RATE // 5
         result["envelope"] = [round(float(v), 2) for v in x[::step]]
@@ -220,7 +233,8 @@ def local_ip():
         s.close()
 
 
-def simulate(detector: BreathDetector, bpm: float, samplerate: int, stop: threading.Event):
+def simulate(detector: BreathDetector, bpm: float, samplerate: int, noise_level: float,
+             stop: threading.Event):
     """Genera respiri sintetici (rumore modulato) per provare senza microfono."""
     rng = np.random.default_rng()
     chunk = samplerate // 10
@@ -231,8 +245,9 @@ def simulate(detector: BreathDetector, bpm: float, samplerate: int, stop: thread
         phase = (ts * cur_bpm / 60.0) % 1.0
         # Espirazione udibile nel primo 40% del ciclo.
         amp = np.where(phase < 0.4, np.sin(np.pi * phase / 0.4) ** 2, 0.0)
-        noise = rng.normal(0, 1, chunk)
-        detector.feed((0.2 * amp * noise + 0.01 * noise).astype(np.float32))
+        breath = rng.normal(0, 1, chunk)
+        background = rng.normal(0, 1, chunk)
+        detector.feed((0.2 * amp * breath + noise_level * background).astype(np.float32))
         t += chunk / samplerate
         time.sleep(chunk / samplerate)
 
@@ -262,6 +277,8 @@ def main():
     p.add_argument("--log", help="salva i valori in un file CSV")
     p.add_argument("--simulate", type=float, metavar="BPM",
                    help="usa respiri sintetici invece del microfono (per test)")
+    p.add_argument("--sim-noise", type=float, default=0.01, metavar="AMPIEZZA",
+                   help="rumore di fondo della simulazione (0.01 basso, 0.1 medio, 0.3 alto)")
     args = p.parse_args()
 
     if args.list_devices:
@@ -288,7 +305,8 @@ def main():
     stop = threading.Event()
     stream = None
     if args.simulate:
-        threading.Thread(target=simulate, args=(detector, args.simulate, args.samplerate, stop),
+        threading.Thread(target=simulate, args=(detector, args.simulate, args.samplerate,
+                                                   args.sim_noise, stop),
                          daemon=True).start()
         source = f"simulazione {args.simulate} BPM"
     else:
@@ -312,7 +330,7 @@ def main():
         log_file = open(args.log, "a", newline="")
         writer = csv.writer(log_file)
         if log_file.tell() == 0:
-            writer.writerow(["timestamp", "bpm", "quality", "status"])
+            writer.writerow(["timestamp", "bpm", "quality", "noise_floor_db", "snr_db", "status"])
 
     try:
         while True:
@@ -322,11 +340,12 @@ def main():
             r["sounds_per_breath"] = args.sounds_per_breath
             broadcaster.publish(r)
             bpm = f"{r['bpm']:5.1f}" if r["bpm"] is not None else "  -- "
-            print(f"\rBPM: {bpm}  qualità: {r['quality']:.2f}  stato: {r['status']:<28}",
-                  end="", flush=True)
+            noise = f"{r['noise_floor']:6.1f} dB" if r["noise_floor"] is not None else "   -- dB"
+            print(f"\rBPM: {bpm}  qualità: {r['quality']:.2f}  rumore: {noise}  "
+                  f"stato: {r['status']:<28}", end="", flush=True)
             if writer:
                 writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), r["bpm"],
-                                 r["quality"], r["status"]])
+                                 r["quality"], r["noise_floor"], r["snr"], r["status"]])
                 log_file.flush()
     except KeyboardInterrupt:
         print("\nChiusura...")

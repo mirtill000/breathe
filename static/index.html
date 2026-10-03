@@ -22,6 +22,17 @@
   .dot.ok { background:#2fb36b; } .dot.warn { background:#e0a326; } .dot.off { background:#d9534f; }
   h2 { font-size:14px; font-weight:600; color:var(--muted); margin:0 0 10px; text-transform:uppercase; letter-spacing:.04em; }
   canvas { width:100%; height:160px; display:block; }
+  .meter { position:relative; height:22px; border-radius:6px; background:var(--line); overflow:hidden; margin:6px 0 4px; }
+  .meter .fill { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--accent); opacity:.55; transition:width .4s; }
+  .meter .noise { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--muted); opacity:.45; transition:width .4s; }
+  .meter .mark { position:absolute; top:0; bottom:0; width:3px; margin-left:-1px; display:none; transition:left .4s; }
+  .meter .mark.noise-mark { background:var(--fg); }
+  .meter .mark.breath-mark { background:var(--peak); }
+  .scale { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:12px; font-size:14px; color:var(--muted); }
+  .legend b { color:var(--fg); font-weight:600; font-variant-numeric: tabular-nums; }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+  #noise-msg { margin-top:10px; font-size:14px; }
 </style>
 </head>
 <body>
@@ -35,6 +46,23 @@
       <span>Livello: <b id="level">-</b></span>
       <span>Sorgente: <b id="source">-</b></span>
     </div>
+  </section>
+  <section class="card">
+    <h2>Rumore di fondo</h2>
+    <div class="meter" title="Livello del microfono in dB (0 = massimo)">
+      <div class="fill" id="m-level"></div>
+      <div class="noise" id="m-noise"></div>
+      <div class="mark noise-mark" id="m-noise-mark"></div>
+      <div class="mark breath-mark" id="m-breath-mark"></div>
+    </div>
+    <div class="scale"><span>-90 dB</span><span>-60</span><span>-30</span><span>0 dB</span></div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--muted)"></span>Rumore di fondo: <b id="noise">-</b></span>
+      <span><span class="sw" style="background:var(--peak)"></span>Livello respiro: <b id="breath">-</b></span>
+      <span><span class="sw" style="background:var(--accent)"></span>Livello attuale: <b id="level2">-</b></span>
+      <span>Margine respiro/rumore: <b id="snr">-</b></span>
+    </div>
+    <div id="noise-msg"><span id="noise-dot" class="dot"></span><span id="noise-text">in attesa di dati...</span></div>
   </section>
   <section class="card">
     <h2>Suono del respiro (ultimi secondi)</h2>
@@ -102,7 +130,36 @@ function drawTrend() {
   ctx.stroke();
 }
 
+const DB_MIN = -90, DB_MAX = 0;
+const pct = v => Math.max(0, Math.min(100, (v - DB_MIN) / (DB_MAX - DB_MIN) * 100)) + '%';
+const fmtDb = v => v == null ? '-' : v.toFixed(0) + ' dB';
+
+function updateNoise(d) {
+  const has = v => v != null && isFinite(v);
+  $('m-level').style.width = has(d.level) && d.level ? pct(d.level) : '0';
+  $('m-noise').style.width = has(d.noise_floor) ? pct(d.noise_floor) : '0';
+  for (const [id, v] of [['m-noise-mark', d.noise_floor], ['m-breath-mark', d.breath_level]]) {
+    $(id).style.display = has(v) ? 'block' : 'none';
+    if (has(v)) $(id).style.left = pct(v);
+  }
+  $('noise').textContent = fmtDb(d.noise_floor);
+  $('breath').textContent = fmtDb(d.breath_level);
+  $('level2').textContent = d.level ? fmtDb(d.level) : '-';
+  $('snr').textContent = has(d.snr) ? d.snr.toFixed(0) + ' dB' : '-';
+  const msg = {
+    basso: ['ok', 'Rumore basso: il respiro si distingue bene dal fondo'],
+    medio: ['warn', 'Rumore medio: rilevazione possibile ma meno affidabile'],
+    alto:  ['off', 'Rumore alto: il respiro si confonde con il fondo, avvicina il microfono o riduci i rumori'],
+  }[d.noise_status];
+  const [cls, text] = msg || (has(d.noise_floor)
+    ? ['warn', 'Rumore di fondo misurato, nessun respiro distinguibile dal fondo']
+    : ['', 'in attesa di dati...']);
+  $('noise-dot').className = 'dot ' + cls;
+  $('noise-text').textContent = text;
+}
+
 function update(d) {
+  updateNoise(d);
   $('bpm').textContent = d.bpm != null ? Math.round(d.bpm) : '--';
   $('status').textContent = d.status;
   $('quality').textContent = d.bpm != null ? Math.round(d.quality * 100) + '%' : '-';
