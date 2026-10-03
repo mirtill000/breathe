@@ -56,7 +56,10 @@ python3 breathe.py --list-devices      # trova l'indice del microfono esterno
 python3 breathe.py --device 2          # avvia con quel microfono
 ```
 
-Poi apri <http://localhost:8000>. La pagina mostra il valore BPM, la qualità
+Poi apri <http://localhost:8000>. Il server è raggiungibile anche dagli altri
+dispositivi della stessa rete (telefono, tablet, altri PC): all'avvio lo script
+stampa l'indirizzo da usare, ad esempio `http://192.168.1.20:8000`. Se macOS
+chiede di consentire le connessioni in entrata a Python, rispondi *Consenti*. La pagina mostra il valore BPM, la qualità
 della stima, il grafico del suono del respiro (i punti rossi sono i respiri
 riconosciuti) e l'andamento nel tempo. Si aggiorna ogni secondo.
 
@@ -71,7 +74,7 @@ python3 breathe.py --simulate 18
 | Opzione | Default | Quando cambiarla |
 |---|---|---|
 | `--device N` | microfono di sistema | per scegliere il microfono esterno |
-| `--host 0.0.0.0` | `127.0.0.1` | per vedere la pagina da telefono/altri PC nella stessa rete (`http://<ip-del-mac>:8000`) |
+| `--host 127.0.0.1` | `0.0.0.0` (tutta la rete locale) | per rendere la pagina visibile solo da questo Mac |
 | `--port` | `8000` | se la porta è occupata |
 | `--sounds-per-breath 2` | `1` | se si sentono **sia** inspirazione **sia** espirazione: altrimenti il valore risulta doppio |
 | `--max-bpm` | `80` | alzalo per animali piccoli (gatti/cani piccoli a riposo 20–40, roditori molto di più) |

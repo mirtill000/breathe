@@ -8,7 +8,7 @@ reale i respiri al minuto (BPM) su una pagina web locale.
 Uso rapido:
     python3 breathe.py --list-devices
     python3 breathe.py --device 2
-    # poi apri http://localhost:8000
+    # poi apri http://localhost:8000 o l'indirizzo di rete mostrato
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import collections
 import csv
 import json
 import queue
+import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -207,6 +208,18 @@ def make_handler(broadcaster: Broadcaster):
     return Handler
 
 
+def local_ip():
+    """IP del computer sulla rete locale (None se non connesso)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))  # nessun pacchetto viene inviato
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
 def simulate(detector: BreathDetector, bpm: float, samplerate: int, stop: threading.Event):
     """Genera respiri sintetici (rumore modulato) per provare senza microfono."""
     rng = np.random.default_rng()
@@ -231,8 +244,9 @@ def main():
     p.add_argument("--device", help="indice o nome del microfono (default: quello di sistema)")
     p.add_argument("--samplerate", type=int, default=16000)
     p.add_argument("--port", type=int, default=8000, help="porta HTTP (default 8000)")
-    p.add_argument("--host", default="127.0.0.1",
-                   help="indirizzo di ascolto; usa 0.0.0.0 per vedere la pagina da altri dispositivi")
+    p.add_argument("--host", default="0.0.0.0",
+                   help="indirizzo di ascolto (default 0.0.0.0 = tutta la rete locale; "
+                        "127.0.0.1 = solo questo computer)")
     p.add_argument("--low", type=float, default=150.0, help="frequenza minima del filtro (Hz)")
     p.add_argument("--high", type=float, default=2500.0, help="frequenza massima del filtro (Hz)")
     p.add_argument("--window", type=float, default=45.0, help="finestra di analisi in secondi")
@@ -262,8 +276,14 @@ def main():
     server = ThreadingHTTPServer((args.host, args.port), make_handler(broadcaster))
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    shown_host = "localhost" if args.host in ("127.0.0.1", "0.0.0.0") else args.host
-    print(f"Pagina web: http://{shown_host}:{args.port}  (Ctrl+C per uscire)")
+    if args.host == "0.0.0.0":
+        print(f"Pagina web: http://localhost:{args.port}")
+        lan_ip = local_ip()
+        if lan_ip:
+            print(f"Dalla rete locale: http://{lan_ip}:{args.port}")
+    else:
+        print(f"Pagina web: http://{args.host}:{args.port}")
+    print("(Ctrl+C per uscire)")
 
     stop = threading.Event()
     stream = None
