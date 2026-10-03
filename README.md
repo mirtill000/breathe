@@ -6,13 +6,24 @@ tempo reale i **respiri al minuto (BPM)** su una pagina web locale.
 
 ## Installazione (macOS)
 
+Serve solo Python 3.9 o successivo (quello di macOS va bene: `python3 --version`).
+PortAudio è già incluso nel pacchetto `sounddevice`, quindi Homebrew non serve.
+
 ```bash
-brew install python portaudio          # se non li hai già
 cd breathe
 python3 -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+Se `python3` non c'è, macOS propone di installare gli strumenti da riga di
+comando (`xcode-select --install`), oppure usa l'installer di
+<https://www.python.org/downloads/macos/>.
+
+> Se Homebrew dà `unknown or unsupported macOS version: :sequoia`, è Homebrew
+> a essere vecchio: aggiornalo con `brew update` (o reinstallalo da
+> <https://brew.sh>). Per questo progetto comunque non è necessario.
 
 La prima volta macOS chiederà il permesso di usare il microfono per il
 Terminale (o iTerm/VS Code): concedilo in
