@@ -17,6 +17,12 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+**macOS vecchi (10.9–10.12, es. El Capitan):** installa Python **3.12.10** da
+<https://www.python.org/downloads/release/python-31210/> ("macOS 64-bit
+universal2 installer"), l'ultima versione con installer compatibile; poi
+esegui *Install Certificates.command* nella cartella Applicazioni/Python 3.12.
+`pip` sceglierà da solo versioni di numpy/scipy compatibili.
+
 Se `python3` non c'è, macOS propone di installare gli strumenti da riga di
 comando (`xcode-select --install`), oppure usa l'installer di
 <https://www.python.org/downloads/macos/>.
