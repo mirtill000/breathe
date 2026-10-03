@@ -17,11 +17,25 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-**macOS vecchi (10.9–10.12, es. El Capitan):** installa Python **3.12.10** da
-<https://www.python.org/downloads/release/python-31210/> ("macOS 64-bit
-universal2 installer"), l'ultima versione con installer compatibile; poi
-esegui *Install Certificates.command* nella cartella Applicazioni/Python 3.12.
-`pip` sceglierà da solo versioni di numpy/scipy compatibili.
+**macOS vecchi (10.9–10.12, es. El Capitan):** l'installer di Python 3.12.10
+è compilato per macOS 10.13 e va in crash (`Symbol not found: _getentropy`).
+Usa Python **3.11.9**
+(<https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg>), poi
+esegui *Install Certificates.command* nella cartella Applicazioni/Python 3.11,
+e installa le dipendenze **solo da pacchetti precompilati** (altrimenti pip
+prova a compilare scipy e fallisce):
+
+```bash
+pip install --only-binary=:all: -r requirements.txt
+```
+
+Il vecchio `git` di El Capitan non accetta i certificati di GitHub: scarica il
+progetto come zip con Python:
+
+```bash
+python3 -c "import urllib.request; urllib.request.urlretrieve('https://github.com/mirtill000/breathe/archive/refs/heads/claude/breath-rate-detector-macos-wn7wco.zip', 'breathe.zip')"
+unzip breathe.zip
+```
 
 Se `python3` non c'è, macOS propone di installare gli strumenti da riga di
 comando (`xcode-select --install`), oppure usa l'installer di
